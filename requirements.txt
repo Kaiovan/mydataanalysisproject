@@ -1,0 +1,40 @@
+# Core dependencies
+pyspark==3.5.0
+pandas==2.1.4
+numpy==1.26.2
+
+# Data visualization
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.18.0
+
+# Database connectors
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# Data processing
+pyarrow==14.0.1
+fastparquet==2023.10.1
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Development and testing
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.12.1
+flake8==6.1.0
+mypy==1.7.1
+
+# Jupyter for notebooks
+jupyter==1.0.0
+jupyterlab==4.0.9
+ipykernel==6.27.1
+
+# Optional: Streaming (if extending to Kafka)
+# kafka-python==2.0.2
+
+# Optional: Cloud storage
+# boto3==1.34.13  # AWS S3
+# google-cloud-storage==2.14.0  # GCP
