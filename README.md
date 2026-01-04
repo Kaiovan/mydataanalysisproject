@@ -439,23 +439,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## Interview Talking Points
-
-When discussing this project in interviews, highlight:
-
-1. **Scalability**: "I designed the pipeline with partitioning and broadcast joins to handle data 100x larger"
-2. **Business Impact**: "The conversion funnel analysis reveals 60% drop-off between cart and checkout"
-3. **Technical Decisions**: "I chose Parquet over CSV for 80% storage reduction and columnar query performance"
-4. **Problem Solving**: "I optimized a data skew issue by repartitioning on session_id instead of user_id"
-5. **Best Practices**: "I implemented idempotent pipeline logic to ensure rerunning doesn't create duplicates"
-
 ## Contact
 
-**Your Name**
-Email: your.email@example.com
-LinkedIn: [linkedin.com/in/yourprofile](https://linkedin.com/in/yourprofile)
-GitHub: [github.com/yourusername](https://github.com/yourusername)
+**Jovan Chua**
+Email: kaiovanchua@gmail.com
+LinkedIn:(https://www.linkedin.com/in/kaijovan/)
+GitHub: (https://github.com/Kaiovan/)
 
 ---
-
-**Built with ❤️ for data engineering**
