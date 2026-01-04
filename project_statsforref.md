@@ -1,4 +1,4 @@
-# Project Summary
+# Project Statistics
 
 ## What This Project Is
 
@@ -44,19 +44,19 @@ A **production-ready data engineering portfolio project** demonstrating end-to-e
 ## Key Features Demonstrated
 
 ### Technical Skills
-✅ Apache Spark (PySpark) - DataFrames, window functions, optimizations
-✅ SQL - Complex queries, CTEs, window functions, aggregations
-✅ Python - OOP, data processing, visualization
-✅ Data Warehouse - Star schema, dimensional modeling
-✅ Performance Optimization - Partitioning, caching, broadcast joins
-✅ DevOps - Docker, version control, testing
+ Apache Spark (PySpark) - DataFrames, window functions, optimizations
+ SQL - Complex queries, CTEs, window functions, aggregations
+ Python - OOP, data processing, visualization
+ Data Warehouse - Star schema, dimensional modeling
+ Performance Optimization - Partitioning, caching, broadcast joins
+ DevOps - Docker, version control, testing
 
 ### Business Analytics
-✅ Conversion funnel analysis
-✅ User segmentation (RFM-style)
-✅ Product performance metrics
-✅ Cohort analysis
-✅ Cart abandonment tracking
+ Conversion funnel analysis
+ User segmentation (RFM-style)
+ Product performance metrics
+ Cohort analysis
+ Cart abandonment tracking
 
 ## File Structure
 
@@ -106,15 +106,6 @@ mydataanalysisproject/
 4. Have examples of how you debugged issues
 5. Connect features to business value
 
-## Next Steps
-
-### Immediate (Before Applying)
-1. ✅ Run the complete pipeline
-2. ✅ Generate sample outputs
-3. ✅ Take screenshots for portfolio
-4. ✅ Update README with your info
-5. ✅ Push to your GitHub
-
 ### Short-term Enhancements (1-2 weeks)
 1. Add unit tests for Spark transformations
 2. Implement data quality checks
@@ -129,25 +120,11 @@ mydataanalysisproject/
 4. Add ML model (churn prediction)
 5. Create interactive dashboard (Streamlit)
 
-## Interview Prep Checklist
-
-- [ ] Can explain each component of the pipeline
-- [ ] Can discuss 3+ optimization techniques used
-- [ ] Can describe the data warehouse schema and why
-- [ ] Can write SQL queries from memory
-- [ ] Can explain how this relates to TikTok's needs
-- [ ] Have specific metrics about performance
-- [ ] Can discuss tradeoffs made
-- [ ] Prepared to demo the project
-- [ ] Can suggest improvements
-
 ## Key Talking Points
 
 **Scalability**: "I designed this with partitioning and broadcast joins to handle 100x larger datasets"
 
 **Performance**: "I optimized from 8 minutes to under 3 minutes through caching, partitioning, and file format choices"
-
-**Business Value**: "The conversion funnel reveals drop-off points, enabling data-driven UX improvements"
 
 **Technical Decisions**: "I chose Parquet over CSV for 80% storage reduction and columnar query performance"
 
@@ -158,18 +135,6 @@ mydataanalysisproject/
 - **Spark Documentation**: https://spark.apache.org/docs/latest/
 - **Data Warehouse Design**: Kimball's "The Data Warehouse Toolkit"
 - **SQL Practice**: https://mode.com/sql-tutorial/
-- **TikTok Engineering Blog**: https://newsroom.tiktok.com/en-us/tag/engineering
-
-## Success Metrics
-
-Track your progress:
-- ✅ Pipeline runs successfully end-to-end
-- ✅ Generates all expected outputs
-- ✅ All visualizations created
-- ✅ Can explain every line of code
-- ✅ Have answered practice interview questions
-- ✅ GitHub README is professional
-- ✅ Added at least one enhancement
 
 
 **Built to demonstrate data engineering skills for internship/job applications**
