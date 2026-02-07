@@ -38,13 +38,24 @@ echo [SUCCESS] ETL pipeline complete
 echo.
 
 REM Step 3: Run analytics and generate visualizations
-echo [STEP] Step 3/3: Running analytics and generating visualizations...
+echo [STEP] Step 3/4: Running analytics and generating visualizations...
 python src\analytics\dashboard.py
 if errorlevel 1 (
     echo [ERROR] Analytics generation failed
     exit /b 1
 )
 echo [SUCCESS] Analytics complete
+echo.
+
+REM Step 4: Run ML pipeline
+echo [STEP] Step 4/4: Running ML pipeline (training models and generating predictions)...
+if not exist "data\ml_output" mkdir data\ml_output
+python src\ml\ml_pipeline.py
+if errorlevel 1 (
+    echo [ERROR] ML pipeline failed
+    exit /b 1
+)
+echo [SUCCESS] ML pipeline complete
 echo.
 
 echo =========================================
@@ -54,6 +65,7 @@ echo.
 echo Generated outputs:
 echo   - Processed data: data\processed\
 echo   - Analytics visualizations: data\analytics_output\
+echo   - ML models and predictions: data\ml_output\
 echo.
 echo To view Spark UI during execution, visit: http://localhost:4040
 echo.

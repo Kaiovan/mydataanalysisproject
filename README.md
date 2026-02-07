@@ -20,6 +20,7 @@ A comprehensive data engineering portfolio project demonstrating end-to-end data
 - [Analytics & Insights](#analytics--insights)
 - [Performance Optimizations](#performance-optimizations)
 - [What I Learned](#what-i-learned)
+- [Machine Learning Models](#machine-learning-models)
 - [Future Improvements](#future-improvements)
 - [Contributing](#contributing)
 - [License](#license)
@@ -114,6 +115,7 @@ The pipeline demonstrates proficiency in distributed data processing, data wareh
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
+| **Machine Learning** | scikit-learn | Predictive models (classification & regression) |
 | **Core Processing** | Apache Spark (PySpark) | Distributed data processing |
 | **Languages** | Python 3.11 | Pipeline development |
 | **Database** | PostgreSQL 16 | Data warehouse |
@@ -145,8 +147,11 @@ mydataanalysisproject/
 │   │   └── clickstream_generator.py
 │   ├── spark_processing/
 │   │   └── etl_pipeline.py
-│   └── analytics/
-│       └── dashboard.py
+│   ├── analytics/
+│   │   └── dashboard.py
+│   └── ml/
+│       ├── __init__.py
+│       └── ml_pipeline.py          # ML models (conversion, churn, LTV)
 ├── tests/                       # Unit tests
 ├── .env.example                # Environment variables template
 ├── Dockerfile                  # Container definition
@@ -248,6 +253,11 @@ python src/spark_processing/etl_pipeline.py
 **Step 3: Generate Analytics**
 ```bash
 python src/analytics/dashboard.py
+```
+
+**Step 4: Run ML Pipeline**
+```bash
+python src/ml/ml_pipeline.py
 ```
 
 ### Using Docker
@@ -401,6 +411,59 @@ Through building this project, I gained hands-on experience with:
 - **Product Analytics**: Identifying top performers and opportunities
 - **User Segmentation**: Grouping users for targeted strategies
 
+## Machine Learning Models
+
+This project integrates three production-ready ML models for predictive analytics using scikit-learn.
+
+### Model 1: Purchase Conversion Prediction
+- **Type**: Binary Classification (RandomForestClassifier)
+- **Purpose**: Predict which browsing sessions will result in a purchase
+- **Features**: Session behavior (page views, clicks, cart actions, duration, device, referrer)
+- **Use Case**: Real-time targeting, personalized promotions, conversion optimization
+
+### Model 2: Customer Churn Prediction
+- **Type**: Binary Classification (RandomForestClassifier)
+- **Purpose**: Identify users at risk of churning based on engagement patterns
+- **Features**: User engagement (sessions, active days, purchase history, recency)
+- **Use Case**: Retention campaigns, win-back strategies, proactive outreach
+
+### Model 3: Customer Lifetime Value (CLV)
+- **Type**: Regression (GradientBoostingRegressor)
+- **Purpose**: Forecast 90-day customer revenue
+- **Features**: Purchase behavior (revenue history, frequency, product diversity)
+- **Use Case**: Marketing budget allocation, VIP identification, acquisition optimization
+
+### ML Pipeline Architecture
+```
+Processed Parquet Data
+    ├── Feature Engineering (derived features, encoding)
+    ├── Model Training (train/test split, cross-validation)
+    ├── Evaluation (accuracy, ROC-AUC, RMSE, feature importance)
+    └── Predictions (saved to Parquet with risk categories)
+         ├── conversion_predictions.parquet
+         ├── churn_predictions.parquet
+         └── ltv_predictions.parquet
+```
+
+### Running the ML Pipeline
+```bash
+# Run ML pipeline only (requires processed data from ETL)
+python src/ml/ml_pipeline.py
+
+# Or run the full pipeline (data generation + ETL + analytics + ML)
+./run_pipeline.sh     # Linux/Mac
+run_pipeline.bat      # Windows
+
+# Explore ML results in Jupyter
+jupyter notebook notebooks/02_ml_analysis.ipynb
+```
+
+### ML Output
+- **Models**: Serialized model artifacts (`.joblib`) in `data/ml_output/models/`
+- **Predictions**: Parquet files with probabilities and risk categories in `data/ml_output/predictions/`
+- **Metrics**: JSON files with accuracy, ROC-AUC, feature importance in `data/ml_output/metrics/`
+- **Visualizations**: Confusion matrices, ROC curves, feature importance plots in `data/ml_output/visualizations/`
+
 ## Future Improvements
 
 ### Technical Enhancements
@@ -412,7 +475,7 @@ Through building this project, I gained hands-on experience with:
 - [ ] Deploy to cloud (AWS/GCP/Azure)
 
 ### Analytics Features
-- [ ] Machine learning models (churn prediction, recommendation engine)
+- [x] Machine learning models (churn prediction, conversion prediction, CLV prediction)
 - [ ] Real-time dashboard with Streamlit or Dash
 - [ ] A/B testing framework
 - [ ] Anomaly detection for fraud/unusual patterns

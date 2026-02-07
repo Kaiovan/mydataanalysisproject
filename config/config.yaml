@@ -49,6 +49,29 @@ performance:
   broadcast_threshold: 10485760  # 10MB
   auto_broadcast_join_threshold: 10485760
 
+# ML Settings
+ml:
+  enabled: true
+  output_path: "data/ml_output"
+  random_state: 42
+  test_size: 0.2
+  cv_folds: 5
+  models:
+    conversion:
+      algorithm: RandomForest
+      n_estimators: 100
+      max_depth: 10
+    churn:
+      algorithm: RandomForest
+      churn_threshold_days: 7
+      n_estimators: 100
+      max_depth: 10
+    ltv:
+      algorithm: GradientBoosting
+      n_estimators: 100
+      max_depth: 5
+      learning_rate: 0.1
+
 # Logging
 logging:
   level: INFO

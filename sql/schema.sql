@@ -632,3 +632,75 @@ SELECT
     ROUND(AVG(CASE WHEN is_abandoned THEN num_add_to_cart END), 2) as avg_items_in_abandoned_cart
 FROM cart_sessions
 GROUP BY event_date, device, browser, user_segment;
+
+-- ============================================================================
+-- ML PREDICTION TABLES
+-- ============================================================================
+
+-- ML Predictions: Session Conversion Probability
+CREATE TABLE IF NOT EXISTS ml_conversion_predictions (
+    session_id VARCHAR(50) PRIMARY KEY,
+    prediction_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    conversion_probability DECIMAL(5, 4),
+    predicted_converted BOOLEAN,
+    conversion_risk VARCHAR(20),
+    actual_converted BOOLEAN,
+    FOREIGN KEY (session_id) REFERENCES fact_sessions(session_id)
+);
+
+CREATE INDEX idx_ml_conversion_risk ON ml_conversion_predictions(conversion_risk);
+
+-- ML Predictions: User Churn Probability
+CREATE TABLE IF NOT EXISTS ml_churn_predictions (
+    user_id VARCHAR(50) PRIMARY KEY,
+    prediction_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    churn_probability DECIMAL(5, 4),
+    predicted_churned BOOLEAN,
+    churn_risk VARCHAR(20),
+    retention_priority_score DECIMAL(10, 2),
+    actual_churned BOOLEAN,
+    FOREIGN KEY (user_id) REFERENCES dim_users(user_id)
+);
+
+CREATE INDEX idx_ml_churn_risk ON ml_churn_predictions(churn_risk);
+CREATE INDEX idx_ml_churn_priority ON ml_churn_predictions(retention_priority_score DESC);
+
+-- ML Predictions: Customer Lifetime Value
+CREATE TABLE IF NOT EXISTS ml_ltv_predictions (
+    user_id VARCHAR(50) PRIMARY KEY,
+    prediction_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    predicted_ltv_90days DECIMAL(10, 2),
+    ltv_category VARCHAR(20),
+    actual_revenue DECIMAL(10, 2),
+    FOREIGN KEY (user_id) REFERENCES dim_users(user_id)
+);
+
+CREATE INDEX idx_ml_ltv_category ON ml_ltv_predictions(ltv_category);
+CREATE INDEX idx_ml_ltv_value ON ml_ltv_predictions(predicted_ltv_90days DESC);
+
+-- View: ML Performance Summary
+CREATE OR REPLACE VIEW vw_ml_performance_summary AS
+SELECT
+    'Conversion' as model_name,
+    COUNT(*) as total_predictions,
+    AVG(conversion_probability) as avg_probability,
+    SUM(CASE WHEN predicted_converted = actual_converted THEN 1 ELSE 0 END)::FLOAT / COUNT(*) as accuracy
+FROM ml_conversion_predictions
+UNION ALL
+SELECT
+    'Churn' as model_name,
+    COUNT(*) as total_predictions,
+    AVG(churn_probability) as avg_probability,
+    SUM(CASE WHEN predicted_churned = actual_churned THEN 1 ELSE 0 END)::FLOAT / COUNT(*) as accuracy
+FROM ml_churn_predictions
+UNION ALL
+SELECT
+    'LTV' as model_name,
+    COUNT(*) as total_predictions,
+    AVG(predicted_ltv_90days) as avg_predicted_value,
+    NULL as accuracy
+FROM ml_ltv_predictions;
+
+COMMENT ON TABLE ml_conversion_predictions IS 'ML predictions for session purchase conversion probability';
+COMMENT ON TABLE ml_churn_predictions IS 'ML predictions for customer churn risk and retention priority';
+COMMENT ON TABLE ml_ltv_predictions IS 'ML predictions for 90-day customer lifetime value';

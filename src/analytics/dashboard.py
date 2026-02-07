@@ -281,6 +281,132 @@ class ClickstreamAnalytics:
 
         plt.close()
 
+    def plot_ml_model_performance(self, output_path: Optional[str] = None):
+        """Plot ML model prediction distributions and performance overview"""
+        ml_path = self.data_path.parent / "ml_output" / "predictions"
+
+        conversion_preds = pd.read_parquet(ml_path / "conversion_predictions.parquet")
+        churn_preds = pd.read_parquet(ml_path / "churn_predictions.parquet")
+        ltv_preds = pd.read_parquet(ml_path / "ltv_predictions.parquet")
+
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        fig.suptitle("ML Model Performance Dashboard", fontsize=16, fontweight="bold")
+
+        # Conversion probability distribution
+        ax1 = axes[0, 0]
+        ax1.hist(conversion_preds["conversion_probability"], bins=50, alpha=0.7, edgecolor="black")
+        ax1.axvline(0.5, color="red", linestyle="--", label="Threshold")
+        ax1.set_xlabel("Conversion Probability")
+        ax1.set_ylabel("Number of Sessions")
+        ax1.set_title("Conversion Probability Distribution")
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+
+        # Conversion risk breakdown
+        ax2 = axes[0, 1]
+        risk_counts = conversion_preds["conversion_risk"].value_counts()
+        colors_risk = {"Low": "green", "Medium": "orange", "High": "red"}
+        ax2.bar(risk_counts.index, risk_counts.values,
+                color=[colors_risk.get(x, "gray") for x in risk_counts.index])
+        ax2.set_ylabel("Number of Sessions")
+        ax2.set_title("Conversion Risk Categories")
+        ax2.grid(True, alpha=0.3, axis="y")
+
+        # Churn probability distribution
+        ax3 = axes[0, 2]
+        ax3.hist(churn_preds["churn_probability"], bins=50, alpha=0.7, edgecolor="black", color="purple")
+        ax3.axvline(0.5, color="red", linestyle="--", label="Threshold")
+        ax3.set_xlabel("Churn Probability")
+        ax3.set_ylabel("Number of Users")
+        ax3.set_title("Churn Probability Distribution")
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+
+        # Churn risk breakdown
+        ax4 = axes[1, 0]
+        churn_risk_counts = churn_preds["churn_risk"].value_counts()
+        ax4.bar(churn_risk_counts.index, churn_risk_counts.values,
+                color=[colors_risk.get(x, "gray") for x in churn_risk_counts.index])
+        ax4.set_ylabel("Number of Users")
+        ax4.set_title("Churn Risk Categories")
+        ax4.grid(True, alpha=0.3, axis="y")
+
+        # LTV: Actual vs Predicted
+        ax5 = axes[1, 1]
+        sample = ltv_preds.sample(min(1000, len(ltv_preds)), random_state=42)
+        ax5.scatter(sample["actual_revenue"], sample["predicted_ltv_90days"], alpha=0.5, s=10)
+        max_val = max(sample["actual_revenue"].max(), sample["predicted_ltv_90days"].max())
+        ax5.plot([0, max_val], [0, max_val], "r--", label="Perfect Prediction")
+        ax5.set_xlabel("Actual Revenue ($)")
+        ax5.set_ylabel("Predicted LTV ($)")
+        ax5.set_title("LTV: Actual vs Predicted")
+        ax5.legend()
+        ax5.grid(True, alpha=0.3)
+
+        # LTV category distribution
+        ax6 = axes[1, 2]
+        ltv_counts = ltv_preds["ltv_category"].value_counts()
+        colors_ltv = ["#d3d3d3", "#90ee90", "#ffa500", "#ff4500"]
+        ax6.bar(range(len(ltv_counts)), ltv_counts.values,
+                color=colors_ltv[: len(ltv_counts)])
+        ax6.set_xticks(range(len(ltv_counts)))
+        ax6.set_xticklabels(ltv_counts.index, rotation=45)
+        ax6.set_ylabel("Number of Users")
+        ax6.set_title("Customer LTV Categories")
+        ax6.grid(True, alpha=0.3, axis="y")
+
+        plt.tight_layout()
+
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches="tight")
+            print(f"Saved ML performance plot to {output_path}")
+        else:
+            plt.show()
+
+        plt.close()
+
+    def plot_feature_importance(self, output_path: Optional[str] = None):
+        """Plot top feature importance for all three ML models"""
+        import json
+
+        ml_path = self.data_path.parent / "ml_output" / "metrics"
+
+        with open(ml_path / "conversion_metrics.json") as f:
+            conversion_metrics = json.load(f)
+        with open(ml_path / "churn_metrics.json") as f:
+            churn_metrics = json.load(f)
+        with open(ml_path / "ltv_metrics.json") as f:
+            ltv_metrics = json.load(f)
+
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        fig.suptitle("Feature Importance Across ML Models", fontsize=16, fontweight="bold")
+
+        configs = [
+            (axes[0], conversion_metrics, "Conversion Model", "steelblue"),
+            (axes[1], churn_metrics, "Churn Model", "purple"),
+            (axes[2], ltv_metrics, "LTV Model", "green"),
+        ]
+
+        for ax, metrics, title, color in configs:
+            importance = pd.Series(metrics["feature_importance"]).nlargest(10)
+            ax.barh(range(len(importance)), importance.values, color=color)
+            ax.set_yticks(range(len(importance)))
+            ax.set_yticklabels(importance.index, fontsize=8)
+            ax.set_xlabel("Importance Score")
+            ax.set_title(f"{title} - Top 10 Features")
+            ax.invert_yaxis()
+            ax.grid(True, alpha=0.3, axis="x")
+
+        plt.tight_layout()
+
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches="tight")
+            print(f"Saved feature importance plot to {output_path}")
+        else:
+            plt.show()
+
+        plt.close()
+
     def generate_summary_report(self, output_path: Optional[str] = None):
         """Generate a text summary report"""
         report = []
@@ -361,6 +487,13 @@ class ClickstreamAnalytics:
             self.plot_session_analysis(str(output_path / "session_analysis.png"))
             self.plot_product_performance(str(output_path / "product_performance.png"))
             self.generate_summary_report(str(output_path / "summary_report.txt"))
+
+            # ML visualizations (only if ML output exists)
+            try:
+                self.plot_ml_model_performance(str(output_path / "ml_model_performance.png"))
+                self.plot_feature_importance(str(output_path / "ml_feature_importance.png"))
+            except FileNotFoundError:
+                print("ML predictions not found. Run ML pipeline first to generate ML visualizations.")
         else:
             self.plot_daily_trends()
             self.plot_user_segments()
