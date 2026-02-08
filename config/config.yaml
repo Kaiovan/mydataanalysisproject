@@ -72,6 +72,14 @@ ml:
       max_depth: 5
       learning_rate: 0.1
 
+# AI / Natural Language Query Settings
+ai:
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 1024
+  temperature: 0.0
+  max_result_rows: 100
+  query_timeout_seconds: 30
+
 # Logging
 logging:
   level: INFO

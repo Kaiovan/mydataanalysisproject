@@ -5,7 +5,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A comprehensive data engineering portfolio project demonstrating end-to-end data pipeline development, ETL processing with Apache Spark, data warehouse design, and analytics for e-commerce clickstream data.
+A comprehensive data engineering and AI portfolio project demonstrating end-to-end data pipeline development, ETL processing with Apache Spark, data warehouse design, machine learning, and an AI-powered natural language query engine for e-commerce clickstream data.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -21,6 +21,7 @@ A comprehensive data engineering portfolio project demonstrating end-to-end data
 - [Performance Optimizations](#performance-optimizations)
 - [What I Learned](#what-i-learned)
 - [Machine Learning Models](#machine-learning-models)
+- [AI-Powered Natural Language SQL Query Engine](#ai-powered-natural-language-sql-query-engine)
 - [Future Improvements](#future-improvements)
 - [Contributing](#contributing)
 - [License](#license)
@@ -71,6 +72,13 @@ The pipeline demonstrates proficiency in distributed data processing, data wareh
 │   Analytics     │ → Static reports (Matplotlib/Seaborn)
 │   Dashboard     │
 └─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│  AI Query       │ → Ask questions in plain English
+│  Engine         │   (Claude API → SQL → Results)
+│  (Anthropic)    │
+└─────────────────┘
 ```
 
 ## Features
@@ -115,6 +123,7 @@ The pipeline demonstrates proficiency in distributed data processing, data wareh
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
+| **AI / GenAI** | Anthropic Claude API | Natural language to SQL query engine |
 | **Machine Learning** | scikit-learn | Predictive models (classification & regression) |
 | **Core Processing** | Apache Spark (PySpark) | Distributed data processing |
 | **Languages** | Python 3.11 | Pipeline development |
@@ -149,9 +158,13 @@ mydataanalysisproject/
 │   │   └── etl_pipeline.py
 │   ├── analytics/
 │   │   └── dashboard.py
-│   └── ml/
+│   ├── ml/
+│   │   ├── __init__.py
+│   │   └── ml_pipeline.py          # ML models (conversion, churn, LTV)
+│   └── ai/
 │       ├── __init__.py
-│       └── ml_pipeline.py          # ML models (conversion, churn, LTV)
+│       ├── nl_to_sql.py            # AI query engine (Claude API → SQL)
+│       └── cli.py                  # Interactive CLI for asking questions
 ├── tests/                       # Unit tests
 ├── .env.example                # Environment variables template
 ├── Dockerfile                  # Container definition
@@ -258,6 +271,11 @@ python src/analytics/dashboard.py
 **Step 4: Run ML Pipeline**
 ```bash
 python src/ml/ml_pipeline.py
+```
+
+**Step 5: Ask Questions with AI (requires API key)**
+```bash
+python src/ai/cli.py
 ```
 
 ### Using Docker
@@ -464,6 +482,165 @@ jupyter notebook notebooks/02_ml_analysis.ipynb
 - **Metrics**: JSON files with accuracy, ROC-AUC, feature importance in `data/ml_output/metrics/`
 - **Visualizations**: Confusion matrices, ROC curves, feature importance plots in `data/ml_output/visualizations/`
 
+## AI-Powered Natural Language SQL Query Engine
+
+This project includes a **Generative AI feature** that lets you ask questions about your data in plain English. It uses **Anthropic's Claude API** to understand your question, convert it into a SQL query, run it against your PostgreSQL database, and return the results — all automatically.
+
+### What It Does (Step by Step)
+
+Here's what happens when you type a question like *"What are the top 10 products by revenue?"*:
+
+```
+1. YOU type a question in plain English
+       ↓
+2. The engine sends your question + the database schema to Claude API
+       ↓
+3. Claude understands what you're asking and writes a SQL query
+       ↓
+4. The engine VALIDATES the SQL (blocks any dangerous commands like DELETE/DROP)
+       ↓
+5. The engine EXECUTES the SQL against your PostgreSQL database (read-only)
+       ↓
+6. Results are formatted and displayed in your terminal
+```
+
+### How It Works (Technical Details)
+
+| Component | What It Does |
+|-----------|--------------|
+| **Schema Introspection** | Reads your database structure (all tables, columns, types) automatically so Claude knows what tables exist |
+| **System Prompt** | Tells Claude it's a SQL expert, gives it the full schema, business context for each table, and example question/SQL pairs |
+| **SQL Validation** | Before running ANY generated SQL, it checks for dangerous keywords (INSERT, DELETE, DROP, ALTER, etc.) and blocks them |
+| **Read-Only Execution** | Database connection is locked to read-only mode — even if validation missed something, the database itself rejects writes |
+| **Query Timeout** | 30-second timeout prevents runaway queries from freezing your database |
+| **Auto-LIMIT** | Results are capped at 100 rows to prevent huge data dumps |
+
+### Safety Features
+
+The engine has **3 layers of protection** so it can never modify your data:
+
+1. **Keyword Filter**: Rejects SQL containing INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, GRANT, etc.
+2. **Read-Only Connection**: PostgreSQL connection is set to `readonly=True` — the database itself blocks any writes
+3. **Timeout + Limits**: 30s query timeout and auto-LIMIT on results
+
+### Setup (First Time Only)
+
+**Step 1: Get an Anthropic API Key**
+1. Go to [console.anthropic.com](https://console.anthropic.com/)
+2. Sign up / log in
+3. Go to API Keys and create a new key
+4. Copy the key (it starts with `sk-ant-...`)
+
+**Step 2: Create your `.env` file**
+```bash
+# Copy the template
+copy .env.example .env
+
+# Open .env and replace the placeholder with your actual key:
+# ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
+```
+
+**Step 3: Make sure PostgreSQL is running**
+```bash
+docker-compose up -d postgres
+```
+
+### How to Use It
+
+**Start the interactive CLI:**
+```bash
+python src/ai/cli.py
+```
+
+**You'll see a welcome screen with example queries. Then just type your question:**
+
+```
+======================================================================
+  Natural Language SQL Query Engine
+  Ask questions about your e-commerce data in plain English
+  Powered by Anthropic Claude API
+======================================================================
+
+  Example queries you can try:
+    1. "What are the top 10 products by revenue?"
+    2. "How many users are in each segment?"
+    3. "What is the conversion rate by device type?"
+    4. "Show the daily revenue trend for the last 7 days"
+    5. "Which users have the highest churn risk?"
+    6. "What is the average session duration by browser?"
+    7. "Show me the top 5 categories by number of purchases"
+
+  Commands: help, examples, schema, quit
+----------------------------------------------------------------------
+
+You> What are the top 10 products by revenue?
+
+  Generating SQL...
+
+  Generated SQL:
+  --------------------------------------------------
+    SELECT p.product_name, p.category,
+           ROUND(SUM(e.cart_value)::numeric, 2) AS total_revenue
+    FROM fact_events e
+    JOIN dim_products p ON e.product_id = p.product_id
+    WHERE e.event_type = 'purchase'
+    GROUP BY p.product_name, p.category
+    ORDER BY total_revenue DESC
+    LIMIT 10
+  --------------------------------------------------
+
+  Executing query...
+
+  Results: 10 row(s), 3 column(s)
+
+  product_name     category       total_revenue
+  Widget Pro Max   Electronics    12450.00
+  Smart Watch X    Electronics     8932.50
+  ...
+
+You> quit
+Goodbye!
+```
+
+### Example Questions You Can Ask
+
+| Category | Example Question |
+|----------|-----------------|
+| **Revenue** | "What is the total revenue by category?" |
+| **Users** | "How many users are in each segment?" |
+| **Conversion** | "What is the conversion rate by device type?" |
+| **Products** | "Which products have the highest cart abandonment?" |
+| **Trends** | "Show the daily revenue trend" |
+| **ML Predictions** | "Which users have the highest churn risk?" |
+| **ML Predictions** | "What is the predicted lifetime value for VIP users?" |
+| **Sessions** | "What is the average session duration by browser?" |
+
+### Running Inside Docker
+
+```bash
+docker exec -it clickstream-analytics python src/ai/cli.py
+```
+
+### Running Tests
+
+```bash
+# Run AI module tests only (no API key needed — tests use mocks)
+pytest tests/test_nl_to_sql.py -v
+
+# Run ALL project tests
+pytest tests/ -v
+```
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `src/ai/nl_to_sql.py` | Core engine — Claude API integration, schema introspection, SQL validation, query execution |
+| `src/ai/cli.py` | Interactive terminal interface (REPL) |
+| `tests/test_nl_to_sql.py` | 32 unit tests (validation, generation, formatting, pipeline) |
+| `config/config.yaml` | AI settings (model, temperature, max rows, timeout) |
+| `.env` | Your Anthropic API key (not committed to git) |
+
 ## Future Improvements
 
 ### Technical Enhancements
@@ -476,6 +653,7 @@ jupyter notebook notebooks/02_ml_analysis.ipynb
 
 ### Analytics Features
 - [x] Machine learning models (churn prediction, conversion prediction, CLV prediction)
+- [x] AI-powered natural language SQL query engine (Anthropic Claude API)
 - [ ] Real-time dashboard with Streamlit or Dash
 - [ ] A/B testing framework
 - [ ] Anomaly detection for fraud/unusual patterns
