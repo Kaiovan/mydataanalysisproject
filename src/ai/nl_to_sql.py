@@ -1,12 +1,12 @@
 """
-Natural Language to SQL Query Engine using Anthropic Claude API
+Natural Language to SQL Query Engine using Ollama (Local LLM)
 
 Converts plain English questions about e-commerce clickstream data
 into valid PostgreSQL queries, executes them read-only, and returns
 formatted results.
 
-Uses the Claude API to understand user intent and generate accurate SQL
-against the project's star schema data warehouse.
+Uses Ollama to run a local LLM (e.g., llama3, mistral, codellama)
+for free with no API key required.
 """
 
 import os
@@ -17,13 +17,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import psycopg2
+import requests
 import yaml
 from dotenv import load_dotenv
-
-try:
-    import anthropic
-except ImportError:
-    anthropic = None
 
 warnings.filterwarnings("ignore")
 
@@ -60,11 +56,13 @@ class SchemaContextError(NLToSQLError):
 
 class NLToSQLEngine:
     """
-    Natural Language to SQL query engine using Anthropic Claude API.
+    Natural Language to SQL query engine using Ollama (local LLM).
 
     Converts plain English questions about e-commerce clickstream data
     into valid PostgreSQL queries, executes them read-only, and returns
     formatted results.
+
+    Uses Ollama running locally — completely free, no API key needed.
 
     Safety features:
     - SQL validation rejects dangerous statements (INSERT, DROP, etc.)
@@ -96,7 +94,9 @@ class NLToSQLEngine:
             )
 
         self.config = self._load_config(config_path)
-        self.client = self._init_anthropic_client()
+        self.ollama_url = self.config["ai"]["ollama_url"]
+        self.model = self.config["ai"]["model"]
+        self._check_ollama_connection()
         self.schema_context = self._build_schema_context()
         self.system_prompt = self._build_system_prompt()
 
@@ -118,8 +118,8 @@ class NLToSQLEngine:
             config["ai"] = {}
 
         ai_defaults = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 1024,
+            "model": "llama3",
+            "ollama_url": "http://localhost:11434",
             "temperature": 0.0,
             "max_result_rows": 100,
             "query_timeout_seconds": 30,
@@ -131,30 +131,28 @@ class NLToSQLEngine:
 
         return config
 
-    def _init_anthropic_client(self) -> Optional[Any]:
+    def _check_ollama_connection(self):
         """
-        Initialize Anthropic client with API key from .env file.
-
-        Returns:
-            Anthropic client instance, or None if not available
+        Check if Ollama is running and the model is available.
         """
-        # Load .env from project root
-        env_path = Path(__file__).parent.parent.parent / ".env"
-        load_dotenv(str(env_path))
-
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-
-        if not api_key:
-            print("  WARNING: ANTHROPIC_API_KEY not found in .env file")
-            print("  Create a .env file with: ANTHROPIC_API_KEY=your_key_here")
-            return None
-
-        if anthropic is None:
-            print("  WARNING: anthropic package not installed")
-            print("  Install with: pip install anthropic")
-            return None
-
-        return anthropic.Anthropic(api_key=api_key)
+        try:
+            resp = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
+            resp.raise_for_status()
+            available_models = [
+                m["name"].split(":")[0]
+                for m in resp.json().get("models", [])
+            ]
+            if available_models:
+                print(f"  Ollama connected. Available models: {', '.join(available_models)}")
+            else:
+                print(f"  Ollama connected but no models found.")
+                print(f"  Pull a model with: ollama pull {self.model}")
+        except requests.ConnectionError:
+            print(f"  WARNING: Cannot connect to Ollama at {self.ollama_url}")
+            print(f"  Make sure Ollama is running: ollama serve")
+            print(f"  Then pull a model: ollama pull {self.model}")
+        except Exception as e:
+            print(f"  WARNING: Ollama check failed: {e}")
 
     def _get_db_connection(self) -> psycopg2.extensions.connection:
         """
@@ -305,7 +303,7 @@ class NLToSQLEngine:
 
     def _build_system_prompt(self) -> str:
         """
-        Build the system prompt for Claude with schema context and instructions.
+        Build the system prompt for the LLM with schema context and instructions.
 
         Returns:
             Complete system prompt string
@@ -368,7 +366,7 @@ SQL: SELECT u.user_id, u.user_segment, ROUND(c.churn_probability::numeric, 4) AS
 
     def generate_sql(self, question: str) -> str:
         """
-        Send user question to Claude API and extract the SQL query.
+        Send user question to Ollama and extract the SQL query.
 
         Args:
             question: Natural language question about the data
@@ -377,26 +375,28 @@ SQL: SELECT u.user_id, u.user_segment, ROUND(c.churn_probability::numeric, 4) AS
             Generated SQL query string
 
         Raises:
-            NLToSQLError: If API call fails or client is not initialized
+            NLToSQLError: If Ollama API call fails
         """
-        if self.client is None:
-            raise NLToSQLError(
-                "Anthropic client not initialized. "
-                "Set ANTHROPIC_API_KEY in your .env file."
-            )
-
         try:
-            response = self.client.messages.create(
-                model=self.config["ai"]["model"],
-                max_tokens=self.config["ai"]["max_tokens"],
-                temperature=self.config["ai"]["temperature"],
-                system=self.system_prompt,
-                messages=[
-                    {"role": "user", "content": question}
-                ],
+            response = requests.post(
+                f"{self.ollama_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": question},
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": self.config["ai"]["temperature"],
+                    },
+                },
+                timeout=120,
             )
+            response.raise_for_status()
 
-            sql = response.content[0].text.strip()
+            result = response.json()
+            sql = result["message"]["content"].strip()
 
             # Strip markdown code fences if present
             sql = re.sub(r"^```(?:sql)?\s*", "", sql)
@@ -406,10 +406,26 @@ SQL: SELECT u.user_id, u.user_segment, ROUND(c.churn_probability::numeric, 4) AS
             # Remove trailing semicolons
             sql = sql.rstrip(";").strip()
 
+            # If the model returned explanations, try to extract just the SQL
+            if not sql.upper().startswith(("SELECT", "WITH")):
+                sql_match = re.search(
+                    r"((?:SELECT|WITH)\s+.+)",
+                    sql,
+                    re.IGNORECASE | re.DOTALL,
+                )
+                if sql_match:
+                    sql = sql_match.group(1).rstrip(";").strip()
+
             return sql
 
+        except requests.ConnectionError:
+            raise NLToSQLError(
+                "Cannot connect to Ollama. Make sure it's running: ollama serve"
+            )
+        except requests.Timeout:
+            raise NLToSQLError("Ollama request timed out. The model may be loading.")
         except Exception as e:
-            raise NLToSQLError(f"Claude API error: {e}")
+            raise NLToSQLError(f"Ollama API error: {e}")
 
     def validate_sql(self, sql: str) -> Tuple[bool, str]:
         """
@@ -438,7 +454,6 @@ SQL: SELECT u.user_id, u.user_segment, ROUND(c.churn_probability::numeric, 4) AS
             return False, f"Query must start with SELECT or WITH, got: {first_word}"
 
         # Remove string literals to avoid false positives on keywords inside strings
-        # Replace 'anything' with '' to neutralize string content
         cleaned = re.sub(r"'[^']*'", "''", normalized)
 
         # Check for forbidden keywords (as whole words)

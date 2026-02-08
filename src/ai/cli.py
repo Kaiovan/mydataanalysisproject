@@ -3,7 +3,7 @@ Interactive CLI for Natural Language SQL Queries
 
 Provides a REPL interface where users can ask questions about their
 e-commerce clickstream data in plain English. Questions are converted
-to SQL using the Claude API and executed against PostgreSQL.
+to SQL using Ollama (local LLM) and executed against PostgreSQL.
 
 Usage:
     python -m src.ai.cli
@@ -47,7 +47,7 @@ class NLToSQLCLI:
         print("=" * 70)
         print("  Natural Language SQL Query Engine")
         print("  Ask questions about your e-commerce data in plain English")
-        print("  Powered by Anthropic Claude API")
+        print("  Powered by Ollama (Local LLM - Free, No API Key)")
         print("=" * 70)
         print()
         print("  Example queries you can try:")
@@ -103,8 +103,9 @@ class NLToSQLCLI:
             print()
         except Exception as e:
             print(f"  ERROR: Failed to initialize engine: {e}")
-            print("  Make sure your .env file has ANTHROPIC_API_KEY set")
-            print("  and PostgreSQL is running (docker-compose up -d postgres)")
+            print("  Make sure Ollama is running: ollama serve")
+            print("  Pull a model: ollama pull llama3")
+            print("  And PostgreSQL is running: docker-compose up -d postgres")
             return
 
         # REPL loop

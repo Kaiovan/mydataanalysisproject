@@ -72,10 +72,10 @@ ml:
       max_depth: 5
       learning_rate: 0.1
 
-# AI / Natural Language Query Settings
+# AI / Natural Language Query Settings (Ollama - Local LLM, Free)
 ai:
-  model: "claude-sonnet-4-20250514"
-  max_tokens: 1024
+  model: "llama3"                    # Ollama model name (llama3, mistral, codellama, etc.)
+  ollama_url: "http://localhost:11434"  # Ollama server URL
   temperature: 0.0
   max_result_rows: 100
   query_timeout_seconds: 30

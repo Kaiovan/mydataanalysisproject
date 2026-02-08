@@ -36,8 +36,8 @@ ipykernel==6.27.1
 scikit-learn==1.3.2
 joblib==1.3.2
 
-# AI / LLM
-anthropic>=0.40.0
+# AI / LLM (Ollama - uses HTTP requests, no SDK needed)
+requests>=2.31.0
 
 # Optional: Streaming (if extending to Kafka)
 # kafka-python==2.0.2

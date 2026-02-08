@@ -76,8 +76,8 @@ The pipeline demonstrates proficiency in distributed data processing, data wareh
          ▼
 ┌─────────────────┐
 │  AI Query       │ → Ask questions in plain English
-│  Engine         │   (Claude API → SQL → Results)
-│  (Anthropic)    │
+│  Engine         │   (Ollama LLM → SQL → Results)
+│  (Ollama/Local) │
 └─────────────────┘
 ```
 
@@ -123,7 +123,7 @@ The pipeline demonstrates proficiency in distributed data processing, data wareh
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
-| **AI / GenAI** | Anthropic Claude API | Natural language to SQL query engine |
+| **AI / GenAI** | Ollama (Local LLM) | Natural language to SQL query engine (free, no API key) |
 | **Machine Learning** | scikit-learn | Predictive models (classification & regression) |
 | **Core Processing** | Apache Spark (PySpark) | Distributed data processing |
 | **Languages** | Python 3.11 | Pipeline development |
@@ -163,7 +163,7 @@ mydataanalysisproject/
 │   │   └── ml_pipeline.py          # ML models (conversion, churn, LTV)
 │   └── ai/
 │       ├── __init__.py
-│       ├── nl_to_sql.py            # AI query engine (Claude API → SQL)
+│       ├── nl_to_sql.py            # AI query engine (Ollama → SQL)
 │       └── cli.py                  # Interactive CLI for asking questions
 ├── tests/                       # Unit tests
 ├── .env.example                # Environment variables template
@@ -273,8 +273,14 @@ python src/analytics/dashboard.py
 python src/ml/ml_pipeline.py
 ```
 
-**Step 5: Ask Questions with AI (requires API key)**
+**Step 5: Ask Questions with AI (requires Ollama running locally)**
 ```bash
+# First, install and start Ollama (one-time setup):
+# Download from https://ollama.ai, then:
+ollama serve
+ollama pull llama3
+
+# Run the AI query engine:
 python src/ai/cli.py
 ```
 
@@ -484,7 +490,7 @@ jupyter notebook notebooks/02_ml_analysis.ipynb
 
 ## AI-Powered Natural Language SQL Query Engine
 
-This project includes a **Generative AI feature** that lets you ask questions about your data in plain English. It uses **Anthropic's Claude API** to understand your question, convert it into a SQL query, run it against your PostgreSQL database, and return the results — all automatically.
+This project includes a **Generative AI feature** that lets you ask questions about your data in plain English. It uses **Ollama** (a local LLM runner) to understand your question, convert it into a SQL query, run it against your PostgreSQL database, and return the results — all automatically. **Completely free, no API key needed.**
 
 ### What It Does (Step by Step)
 
@@ -493,9 +499,9 @@ Here's what happens when you type a question like *"What are the top 10 products
 ```
 1. YOU type a question in plain English
        ↓
-2. The engine sends your question + the database schema to Claude API
+2. The engine sends your question + the database schema to Ollama (local LLM)
        ↓
-3. Claude understands what you're asking and writes a SQL query
+3. The LLM understands what you're asking and writes a SQL query
        ↓
 4. The engine VALIDATES the SQL (blocks any dangerous commands like DELETE/DROP)
        ↓
@@ -508,9 +514,10 @@ Here's what happens when you type a question like *"What are the top 10 products
 
 | Component | What It Does |
 |-----------|--------------|
-| **Schema Introspection** | Reads your database structure (all tables, columns, types) automatically so Claude knows what tables exist |
-| **System Prompt** | Tells Claude it's a SQL expert, gives it the full schema, business context for each table, and example question/SQL pairs |
+| **Schema Introspection** | Reads your database structure (all tables, columns, types) automatically so the LLM knows what tables exist |
+| **System Prompt** | Tells the LLM it's a SQL expert, gives it the full schema, business context for each table, and example question/SQL pairs |
 | **SQL Validation** | Before running ANY generated SQL, it checks for dangerous keywords (INSERT, DELETE, DROP, ALTER, etc.) and blocks them |
+| **SQL Extraction** | Handles cases where local models include explanations alongside SQL — automatically extracts the SQL portion |
 | **Read-Only Execution** | Database connection is locked to read-only mode — even if validation missed something, the database itself rejects writes |
 | **Query Timeout** | 30-second timeout prevents runaway queries from freezing your database |
 | **Auto-LIMIT** | Results are capped at 100 rows to prevent huge data dumps |
@@ -525,22 +532,16 @@ The engine has **3 layers of protection** so it can never modify your data:
 
 ### Setup (First Time Only)
 
-**Step 1: Get an Anthropic API Key**
-1. Go to [console.anthropic.com](https://console.anthropic.com/)
-2. Sign up / log in
-3. Go to API Keys and create a new key
-4. Copy the key (it starts with `sk-ant-...`)
-
-**Step 2: Create your `.env` file**
+**Step 1: Install Ollama (free, runs locally)**
+1. Download Ollama from [ollama.ai](https://ollama.ai)
+2. Install it (available for Windows, Mac, and Linux)
+3. Start the Ollama server and pull a model:
 ```bash
-# Copy the template
-copy .env.example .env
-
-# Open .env and replace the placeholder with your actual key:
-# ANTHROPIC_API_KEY=sk-ant-your-actual-key-here
+ollama serve
+ollama pull llama3
 ```
 
-**Step 3: Make sure PostgreSQL is running**
+**Step 2: Make sure PostgreSQL is running**
 ```bash
 docker-compose up -d postgres
 ```
@@ -558,7 +559,7 @@ python src/ai/cli.py
 ======================================================================
   Natural Language SQL Query Engine
   Ask questions about your e-commerce data in plain English
-  Powered by Anthropic Claude API
+  Powered by Ollama (Local LLM - Free, No API Key)
 ======================================================================
 
   Example queries you can try:
@@ -615,6 +616,16 @@ Goodbye!
 | **ML Predictions** | "What is the predicted lifetime value for VIP users?" |
 | **Sessions** | "What is the average session duration by browser?" |
 
+### Supported Ollama Models
+
+| Model | Best For | Pull Command |
+|-------|----------|-------------|
+| **llama3** (default) | General-purpose, good SQL generation | `ollama pull llama3` |
+| **codellama** | Code-focused, strong SQL skills | `ollama pull codellama` |
+| **mistral** | Fast, lightweight | `ollama pull mistral` |
+
+Change the model in `config/config.yaml` under `ai.model`.
+
 ### Running Inside Docker
 
 ```bash
@@ -635,11 +646,10 @@ pytest tests/ -v
 
 | File | Purpose |
 |------|---------|
-| `src/ai/nl_to_sql.py` | Core engine — Claude API integration, schema introspection, SQL validation, query execution |
+| `src/ai/nl_to_sql.py` | Core engine — Ollama integration, schema introspection, SQL validation, query execution |
 | `src/ai/cli.py` | Interactive terminal interface (REPL) |
-| `tests/test_nl_to_sql.py` | 32 unit tests (validation, generation, formatting, pipeline) |
-| `config/config.yaml` | AI settings (model, temperature, max rows, timeout) |
-| `.env` | Your Anthropic API key (not committed to git) |
+| `tests/test_nl_to_sql.py` | Unit tests (validation, generation, formatting, pipeline) |
+| `config/config.yaml` | AI settings (model, Ollama URL, temperature, max rows, timeout) |
 
 ## Future Improvements
 
@@ -653,7 +663,7 @@ pytest tests/ -v
 
 ### Analytics Features
 - [x] Machine learning models (churn prediction, conversion prediction, CLV prediction)
-- [x] AI-powered natural language SQL query engine (Anthropic Claude API)
+- [x] AI-powered natural language SQL query engine (Ollama - free local LLM)
 - [ ] Real-time dashboard with Streamlit or Dash
 - [ ] A/B testing framework
 - [ ] Anomaly detection for fraud/unusual patterns

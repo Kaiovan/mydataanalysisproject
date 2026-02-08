@@ -2,8 +2,8 @@
 Unit tests for NL-to-SQL query engine
 
 Tests SQL validation, schema context building, result formatting,
-and query execution logic. Claude API calls are mocked to avoid
-requiring an API key for testing.
+and query execution logic. Ollama API calls are mocked to avoid
+requiring a running Ollama server for testing.
 """
 
 import pytest
@@ -31,7 +31,7 @@ from ai.nl_to_sql import (
 
 @pytest.fixture
 def engine():
-    """Create an NLToSQLEngine with mocked dependencies (no API key or DB needed)."""
+    """Create an NLToSQLEngine with mocked dependencies (no Ollama or DB needed)."""
     with patch.object(NLToSQLEngine, "__init__", lambda self, *args, **kwargs: None):
         eng = NLToSQLEngine.__new__(NLToSQLEngine)
         eng.config = {
@@ -43,14 +43,15 @@ def engine():
                 "password": "dataeng123",
             },
             "ai": {
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1024,
+                "model": "llama3",
+                "ollama_url": "http://localhost:11434",
                 "temperature": 0.0,
                 "max_result_rows": 100,
                 "query_timeout_seconds": 30,
             },
         }
-        eng.client = MagicMock()
+        eng.ollama_url = "http://localhost:11434"
+        eng.model = "llama3"
         eng.schema_context = "TABLE: dim_users\n  - user_id: varchar(50)"
         eng.system_prompt = "You are a SQL expert."
         return eng
@@ -155,52 +156,91 @@ class TestSQLValidation:
 
 
 # =============================================================================
-# SQL Generation Tests (mocked Claude API)
+# SQL Generation Tests (mocked Ollama API)
 # =============================================================================
 
 
 class TestSQLGeneration:
-    """Tests for Claude API SQL generation (mocked)."""
+    """Tests for Ollama API SQL generation (mocked)."""
 
-    def test_generate_sql_returns_string(self, engine):
-        # Mock Claude response
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="SELECT * FROM dim_users LIMIT 10")]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_generate_sql_returns_string(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {"content": "SELECT * FROM dim_users LIMIT 10"}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
         sql = engine.generate_sql("Show me all users")
         assert isinstance(sql, str)
         assert "SELECT" in sql
 
-    def test_strips_markdown_fences(self, engine):
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text="```sql\nSELECT * FROM dim_users\n```")
-        ]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_strips_markdown_fences(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {"content": "```sql\nSELECT * FROM dim_users\n```"}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
         sql = engine.generate_sql("Show me all users")
         assert "```" not in sql
         assert sql == "SELECT * FROM dim_users"
 
-    def test_strips_trailing_semicolon(self, engine):
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="SELECT * FROM dim_users;")]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_strips_trailing_semicolon(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {"content": "SELECT * FROM dim_users;"}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
         sql = engine.generate_sql("Show me all users")
         assert not sql.endswith(";")
 
-    def test_handles_api_error_gracefully(self, engine):
-        engine.client.messages.create.side_effect = Exception("API timeout")
+    @patch("ai.nl_to_sql.requests.post")
+    def test_extracts_sql_from_explanation(self, mock_post, engine):
+        """Test that SQL is extracted when model includes explanation text."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {
+                "content": "Here is the query you need:\nSELECT * FROM dim_users LIMIT 10"
+            }
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
-        with pytest.raises(NLToSQLError, match="Claude API error"):
+        sql = engine.generate_sql("Show me all users")
+        assert sql.startswith("SELECT")
+
+    @patch("ai.nl_to_sql.requests.post")
+    def test_handles_connection_error(self, mock_post, engine):
+        import requests as req
+        mock_post.side_effect = req.ConnectionError("Connection refused")
+
+        with pytest.raises(NLToSQLError, match="Cannot connect to Ollama"):
             engine.generate_sql("Show me all users")
 
-    def test_raises_error_when_no_client(self, engine):
-        engine.client = None
+    @patch("ai.nl_to_sql.requests.post")
+    def test_handles_timeout_error(self, mock_post, engine):
+        import requests as req
+        mock_post.side_effect = req.Timeout("Request timed out")
 
-        with pytest.raises(NLToSQLError, match="not initialized"):
+        with pytest.raises(NLToSQLError, match="timed out"):
+            engine.generate_sql("Show me all users")
+
+    @patch("ai.nl_to_sql.requests.post")
+    def test_handles_generic_api_error(self, mock_post, engine):
+        mock_post.side_effect = Exception("Something broke")
+
+        with pytest.raises(NLToSQLError, match="Ollama API error"):
             engine.generate_sql("Show me all users")
 
 
@@ -254,15 +294,18 @@ class TestResultFormatting:
 class TestAskPipeline:
     """Tests for the full ask() pipeline."""
 
-    def test_successful_ask(self, engine):
-        # Mock generate_sql
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text="SELECT user_segment, COUNT(*) AS cnt FROM dim_users GROUP BY user_segment")
-        ]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_successful_ask(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {
+                "content": "SELECT user_segment, COUNT(*) AS cnt FROM dim_users GROUP BY user_segment"
+            }
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
-        # Mock execute_query
         mock_df = pd.DataFrame({
             "user_segment": ["High Value", "Converted"],
             "cnt": [50, 200],
@@ -275,28 +318,37 @@ class TestAskPipeline:
         assert result["results_df"] is not None
         assert result["formatted_output"] is not None
 
-    def test_ask_with_api_error(self, engine):
-        engine.client.messages.create.side_effect = Exception("API down")
+    @patch("ai.nl_to_sql.requests.post")
+    def test_ask_with_api_error(self, mock_post, engine):
+        mock_post.side_effect = Exception("API down")
 
         result = engine.ask("Show me users")
         assert result["error"] is not None
         assert "generation failed" in result["error"].lower()
 
-    def test_ask_with_invalid_sql(self, engine):
-        mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="DROP TABLE dim_users")]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_ask_with_invalid_sql(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {"content": "DROP TABLE dim_users"}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
         result = engine.ask("Delete all users")
         assert result["error"] is not None
         assert "validation failed" in result["error"].lower()
 
-    def test_ask_with_execution_error(self, engine):
-        mock_response = MagicMock()
-        mock_response.content = [
-            MagicMock(text="SELECT * FROM nonexistent_table")
-        ]
-        engine.client.messages.create.return_value = mock_response
+    @patch("ai.nl_to_sql.requests.post")
+    def test_ask_with_execution_error(self, mock_post, engine):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "message": {"content": "SELECT * FROM nonexistent_table"}
+        }
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
 
         with patch.object(
             engine,
@@ -319,9 +371,6 @@ class TestSchemaContext:
 
     def test_schema_from_file_fallback(self):
         """Test that schema can be built from sql/schema.sql file."""
-        engine_cls = NLToSQLEngine
-
-        # Call the static-like method directly
         with patch.object(
             NLToSQLEngine, "__init__", lambda self, *args, **kwargs: None
         ):
